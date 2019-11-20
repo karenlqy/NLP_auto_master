@@ -113,20 +113,30 @@ def save_vocab(vocab, path):
         output.write("%s %d\n" %(w,i))
     output.close()
 
+def get_model_from_file(model_path):
+    # model = KeyedVectors.load('w2v_gensim', mmap='r')
+    model = Word2Vec.load(model_path)
+    return model
 
 def prepare_padding(infile, model, outfile, oov_path):
     '''add <start> <end> <pad> <unk> token, prepare sample with right length and retrain word2vec'''
     train = pd.read_csv(infile, encoding='utf-8')
-    train = train[:5]
     lines = []
-    for k in ['input', 'Report']:
-        lines.extend(list(train[k].values))
 
-    new_word_list = ['<s>']
+    lines.extend(list(train['input'].values))
+    max_lens = 0
+    new_lines = []
     oov_list = []
 
     for line in lines:
-        word_list = jieba.cut(str(line), cut_all = False)
+        if len(line) > max_lens:
+            max_lens = len(line)+2
+        else:
+            max_lens = max_lens
+
+
+        new_word_list = ['<s>']
+        word_list = line.strip().split(' ')
         for word in word_list:
             if word in model.wv.vocab:
                 new_word_list.append(word)
@@ -134,18 +144,21 @@ def prepare_padding(infile, model, outfile, oov_path):
                 new_word_list.append('<unk>')
                 oov_list.append(word)
         new_word_list.append('<e>')
+        # print(new_word_list)
+        newline = ' '.join(new_word_list)
+        # print(newline)
+        new_lines.append(newline)
 
     with open(outfile, 'w', encoding='utf-8') as f:
-        for line in new_word_list:
+        for line in new_lines:
             f.write(line)
             f.write('\n')
     with open(oov_path, 'w', encoding='utf-8') as f:
         for oov in oov_list:
             f.write(' '.join(oov))
             f.write('\n')
-
-
-prepare_padding(train_save_path, model, train_padded_path, oov_path)
+    f.close()
+    return max_lens
 
 def write_token_to_file(infile, outfile):
     words = []
@@ -165,10 +178,7 @@ def train_w2v_model(txtPath,model_path):
     print('elapsed time:', time.time() - start_time)
 
 
-def get_model_from_file(model_path):
-    # model = KeyedVectors.load('w2v_gensim', mmap='r')
-    model = Word2Vec.load(model_path)
-    return model
+
 
 
 if __name__ == "__main__":
